@@ -1,14 +1,11 @@
 from flask import Flask, request, jsonify
+import os
 
 app = Flask(__name__)
 
-# Mock function untuk semak job number
 def check_job_in_sftp(job_no):
-    # Untuk test, kita anggap "JOB12345" ada, lain-lain takde
-    if job_no == "JOB12345":
-        return True
-    else:
-        return False
+    # Mock check, ganti dengan logic sebenar nanti
+    return job_no == "JOB12345"
 
 @app.route('/')
 def home():
@@ -29,5 +26,6 @@ def check_job():
         return jsonify({"job_no": job_no, "status": "Job No not found"})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
 
