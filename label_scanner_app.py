@@ -1,44 +1,56 @@
-from flask import Flask, request, jsonify
+from flask import Flask
 import paramiko
 import os
-from io import StringIO
+import tempfile
+import socket
+import base64
 
 app = Flask(__name__)
 
-# --- SFTP Config ---
+# Config
 SFTP_HOST = "transfer.resmed.com"
 SFTP_PORT = 22
-SFTP_USERNAME = "PPC_MY_PRD"
-PRIVATE_KEY_CONTENT = os.getenv("PRIVATE_KEY_CONTENT")
-remote_root = "/PPC_MY_PRD"
+SFTP_USERNAME = "ppcmy"
+PRIVATE_KEY_B64 = os.getenv("SFTP_PRIVATE_KEY_B64")  # from Render
 
 def connect_sftp():
-    keyfile = StringIO(PRIVATE_KEY_CONTENT)
-    private_key = paramiko.RSAKey.from_private_key(keyfile)
+    # Decode private key dari base64
+    private_key_data = base64.b64decode(PRIVATE_KEY_B64)
 
+    # Simpan sementara dalam file
+    with tempfile.NamedTemporaryFile(delete=False) as key_file:
+        key_file.write(private_key_data)
+        key_file_path = key_file.name
+
+    # Load private key dan connect
+    private_key = paramiko.RSAKey.from_private_key_file(key_file_path)
     transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
     transport.connect(username=SFTP_USERNAME, pkey=private_key)
     sftp = paramiko.SFTPClient.from_transport(transport)
     return sftp, transport
 
-@app.route("/check_job", methods=["POST"])
-def check_job():
-    data = request.get_json()
-    job_no = data.get("job_no")
-    if not job_no:
-        return jsonify({"status": "error", "message": "Missing job number"}), 400
+@app.route("/")
+def home():
+    return "Flask API is running."
 
-    if check_job_in_sftp(job_no):
-        return jsonify({"status": "found", "message": f"Job {job_no} found"}), 200
-    else:
-        return jsonify({"status": "not_found", "message": f"Job {job_no} not found"}), 404
+@app.route("/test_socket")
+def test_socket():
+    try:
+        sock = socket.create_connection((SFTP_HOST, SFTP_PORT), timeout=5)
+        sock.close()
+        return "✅ Socket connection to port 22 succeeded!"
+    except Exception as e:
+        return f"❌ Socket connection failed: {e}"
 
-@app.route("/test_sftp", methods=["GET"])
+@app.route("/test_sftp")
 def test_sftp_connection():
     try:
         sftp, transport = connect_sftp()
         sftp.close()
         transport.close()
-        return jsonify({"status": "success", "message": "SFTP connection OK"}), 200
+        return "✅ SFTP connection succeeded!"
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return f"❌ SFTP connection failed: {e}"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
