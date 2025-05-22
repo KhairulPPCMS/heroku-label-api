@@ -1,36 +1,32 @@
 import os
-import base64
 import paramiko
-import socket
 from flask import Flask
 
 app = Flask(__name__)
 
 SFTP_HOST = "transfer.resmed.com"
 SFTP_PORT = 22
-SFTP_USER = "ppcmy"
+SFTP_USER = "PPC_MY_PRD"
+KEY_FILE_PATH = "/etc/secrets/sftp_key.pem"
 
 @app.route("/test_sftp")
 def test_sftp_connection():
     try:
-        key_b64 = os.environ.get("SFTP_PRIVATE_KEY_B64")
-        if not key_b64:
-            return "❌ SFTP_PRIVATE_KEY_B64 not found in environment!", 500
+        os.chmod(KEY_FILE_PATH, 0o600)  # make sure file permission is good
 
-        key_path = "/tmp/temp_key.pem"
-        with open(key_path, "wb") as f:
-            f.write(base64.b64decode(key_b64))
-
-        os.chmod(key_path, 0o600)  # make sure permission okay
-
-        key = paramiko.RSAKey.from_private_key_file(key_path)
+        key = paramiko.RSAKey.from_private_key_file(KEY_FILE_PATH)
 
         transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
         transport.connect(username=SFTP_USER, pkey=key)
         sftp = paramiko.SFTPClient.from_transport(transport)
+
+        # Example action: list files at remote root
+        sftp.chdir("/PPC_MY_PRD")
+        files = sftp.listdir()
+
         sftp.close()
         transport.close()
 
-        return "✅ SFTP connection succeeded!"
+        return f"✅ SFTP connected! Files: {files}"
     except Exception as e:
-        return f"❌ SFTP connection failed: {str(e)}", 500
+        return f"❌ SFTP failed: {str(e)}", 500
