@@ -12,8 +12,7 @@ KEY_FILE_PATH = "/etc/secrets/sftp_key.pem"
 @app.route("/test_sftp")
 def test_sftp_connection():
     try:
-        os.chmod(KEY_FILE_PATH, 0o600)  # make sure file permission is good
-
+        # BUANG chmod sini sebab /etc/secrets read-only
         key = paramiko.RSAKey.from_private_key_file(KEY_FILE_PATH)
 
         transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
